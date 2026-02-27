@@ -1,0 +1,119 @@
+mod cli;
+mod convert;
+mod plan;
+mod rename;
+
+use anyhow::{Result, bail};
+use clap::Parser;
+use colored::Colorize;
+use plan::EntryStatus;
+use std::io::{self, BufRead, IsTerminal, Write};
+
+fn main() -> Result<()> {
+    let args = cli::Args::parse();
+
+    let paths: Vec<String> = if !args.files.is_empty() {
+        args.files.clone()
+    } else if !io::stdin().is_terminal() {
+        io::stdin()
+            .lock()
+            .lines()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|l| !l.is_empty())
+            .collect()
+    } else {
+        cli::Args::parse_from(["romv", "--help"]);
+        unreachable!();
+    };
+
+    let plan = plan::RenamePlan::build(&paths, args.separator, args.verbose);
+
+    if plan.entries.is_empty() {
+        if plan.skipped > 0 {
+            eprintln!("Nothing to rename ({} skipped).", plan.skipped);
+        } else {
+            eprintln!("Nothing to rename.");
+        }
+        return Ok(());
+    }
+
+    if plan.check_collisions() {
+        bail!("Aborting due to collisions. No files were renamed.");
+    }
+
+    let execute = args.yes || args.interactive;
+    plan.display(execute);
+
+    if !execute {
+        eprintln!(
+            "\n{}",
+            "Dry-run complete. Use -y to execute or -i for interactive mode.".dimmed()
+        );
+        return Ok(());
+    }
+
+    let mut renamed = 0;
+    let mut errors = 0;
+
+    for entry in &plan.entries {
+        if entry.status != EntryStatus::Ready {
+            errors += 1;
+            continue;
+        }
+
+        if args.interactive {
+            eprint!(
+                "Rename {} -> {}? [y/N] ",
+                entry.source.display(),
+                entry
+                    .target
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+            );
+            io::stderr().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                if args.verbose {
+                    eprintln!(
+                        "{} {} (user declined)",
+                        "skip:".yellow(),
+                        entry.source.display()
+                    );
+                }
+                continue;
+            }
+        }
+
+        match rename::safe_rename(&entry.source, &entry.target) {
+            Ok(()) => {
+                renamed += 1;
+            }
+            Err(e) => {
+                eprintln!(
+                    "{} {} -> {}: {}",
+                    "error:".red().bold(),
+                    entry.source.display(),
+                    entry.target.display(),
+                    e
+                );
+                errors += 1;
+            }
+        }
+    }
+
+    if args.verbose || errors > 0 {
+        eprintln!(
+            "Done: {renamed} renamed, {errors} errors, {} skipped.",
+            plan.skipped
+        );
+    }
+
+    if errors > 0 {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
