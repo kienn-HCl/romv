@@ -23,15 +23,13 @@ pub struct RenamePlan {
 }
 
 impl RenamePlan {
-    pub fn build(paths: &[String], separator: char, verbose: bool) -> Self {
+    pub fn build(paths: &[PathBuf], separator: char, verbose: bool) -> Self {
         let mut entries = Vec::new();
         let mut skipped = 0;
 
-        for path_str in paths {
-            let source = PathBuf::from(path_str);
-
+        for source in paths {
             if source.symlink_metadata().is_err() {
-                eprintln!("{} {} (not found)", "skip:".yellow(), path_str);
+                eprintln!("{} {} (not found)", "skip:".yellow(), source.display());
                 skipped += 1;
                 continue;
             }
@@ -39,7 +37,11 @@ impl RenamePlan {
             let filename = match source.file_name().and_then(|f| f.to_str()) {
                 Some(f) => f.to_string(),
                 None => {
-                    eprintln!("{} cannot extract filename: {}", "skip:".yellow(), path_str);
+                    eprintln!(
+                        "{} cannot extract filename: {}",
+                        "skip:".yellow(),
+                        source.display()
+                    );
                     skipped += 1;
                     continue;
                 }
@@ -51,7 +53,7 @@ impl RenamePlan {
                 eprintln!(
                     "{} conversion produced empty name: {}",
                     "skip:".yellow(),
-                    path_str
+                    source.display()
                 );
                 skipped += 1;
                 continue;
@@ -59,7 +61,7 @@ impl RenamePlan {
 
             if converted == filename {
                 if verbose {
-                    eprintln!("{} {} (unchanged)", "skip:".dimmed(), path_str);
+                    eprintln!("{} {} (unchanged)", "skip:".dimmed(), source.display());
                 }
                 skipped += 1;
                 continue;
@@ -73,7 +75,7 @@ impl RenamePlan {
             };
 
             entries.push(RenameEntry {
-                source,
+                source: source.clone(),
                 target,
                 status,
             });
@@ -139,5 +141,4 @@ impl RenamePlan {
             }
         }
     }
-
 }

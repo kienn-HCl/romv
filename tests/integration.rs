@@ -204,15 +204,10 @@ fn custom_separator() {
         .unwrap();
 
     assert!(output.status.success());
-    // The converted name should use '-' instead of '_'
-    let entries: Vec<_> = fs::read_dir(dir.path())
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().to_string())
-        .collect();
+    assert!(!file.exists());
     assert!(
-        entries.iter().any(|e| !e.contains(' ')),
-        "spaces should be replaced, entries: {entries:?}"
+        dir.path().join("atarashii-fairu.txt").exists(),
+        "should use '-' as separator"
     );
 }
 

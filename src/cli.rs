@@ -1,11 +1,12 @@
 use clap::Parser;
+use std::path::PathBuf;
 
 /// Rename Japanese filenames to romaji
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
-    /// Files to rename. Reads from stdin if omitted.
-    pub files: Vec<String>,
+    /// Files to rename. Reads from stdin if omitted and input is piped.
+    pub files: Vec<PathBuf>,
 
     /// Execute renames (default is dry-run preview)
     #[arg(short = 'y', long = "yes")]

@@ -68,7 +68,7 @@ Options:
 - Preserves leading dots for hidden files: `.設定.conf` → `.settei.conf`
 - ASCII characters and digits are kept as-is: `第10回.mp4` → `dai10kai.mp4`
 - Only spaces present in the original filename are replaced with `_` (configurable with `-s`)
-- Skips filenames that are already ASCII-only
+- Skips filenames that would not change after conversion
 
 ## Safety
 
