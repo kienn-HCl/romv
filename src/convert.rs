@@ -11,10 +11,23 @@ fn is_japanese(c: char) -> bool {
     )
 }
 
+/// Normalize fullwidth ASCII characters (U+FF01..U+FF5E) to their
+/// halfwidth equivalents (U+0021..U+007E). Fullwidth space (U+3000)
+/// is converted to a regular space.
+fn normalize_fullwidth(c: char) -> char {
+    match c {
+        '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFF01 + 0x21).unwrap_or(c),
+        '\u{3000}' => ' ',
+        _ => c,
+    }
+}
+
 /// Convert only Japanese segments of a string via kakasi, preserving
 /// ASCII and other non-Japanese characters as-is. This prevents kakasi
 /// from mangling digits adjacent to kanji (e.g. `第10回` → `dai10kai`
 /// instead of the broken `daiichi 0 kai`).
+///
+/// Fullwidth ASCII characters are normalized to halfwidth before processing.
 fn convert_segments(s: &str, separator: char) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
@@ -35,11 +48,13 @@ fn convert_segments(s: &str, separator: char) -> String {
             let romaji = converted.romaji.to_lowercase();
             let romaji = romaji.replace(' ', "");
             result.push_str(&romaji);
-        } else if c == ' ' {
-            result.push(separator);
-            chars.next();
         } else {
-            result.push(c);
+            let normalized = normalize_fullwidth(c);
+            if normalized == ' ' {
+                result.push(separator);
+            } else {
+                result.push(normalized);
+            }
             chars.next();
         }
     }
@@ -162,5 +177,20 @@ mod tests {
     #[test]
     fn mixed_japanese_ascii_digits() {
         assert_eq!(convert_filename("報告書_v2.pdf", '_'), "houkokusho_v2.pdf");
+    }
+
+    #[test]
+    fn fullwidth_parentheses() {
+        assert_eq!(convert_filename("テスト（1）.txt", '_'), "tesuto(1).txt");
+    }
+
+    #[test]
+    fn fullwidth_digits() {
+        assert_eq!(convert_filename("テスト１２３.txt", '_'), "tesuto123.txt");
+    }
+
+    #[test]
+    fn fullwidth_space() {
+        assert_eq!(convert_filename("テスト\u{3000}1.txt", '_'), "tesuto_1.txt");
     }
 }
