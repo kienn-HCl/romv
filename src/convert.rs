@@ -18,6 +18,9 @@ fn normalize_fullwidth(c: char) -> char {
     match c {
         '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFF01 + 0x21).unwrap_or(c),
         '\u{3000}' => ' ',
+        '\u{301C}' => '~',  // 波ダッシュ 〜
+        '\u{3001}' => ',',  // 読点 、
+        '\u{3002}' => '.',  // 句点 。
         _ => c,
     }
 }
@@ -192,5 +195,20 @@ mod tests {
     #[test]
     fn fullwidth_space() {
         assert_eq!(convert_filename("テスト\u{3000}1.txt", '_'), "tesuto_1.txt");
+    }
+
+    #[test]
+    fn wave_dash() {
+        assert_eq!(convert_filename("テスト〜1.txt", '_'), "tesuto~1.txt");
+    }
+
+    #[test]
+    fn ideographic_comma() {
+        assert_eq!(convert_filename("テスト、1.txt", '_'), "tesuto,1.txt");
+    }
+
+    #[test]
+    fn ideographic_period() {
+        assert_eq!(convert_filename("テスト。1.txt", '_'), "tesuto.1.txt");
     }
 }
